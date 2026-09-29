@@ -6,6 +6,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const http = require('node:http');
 const { pathToFileURL } = require('node:url');
+const { createHash } = require('node:crypto');
 const { chromium } = require('playwright');
 let browser, server, base;
 const root = process.env.CAITANG_TEST_ROOT || path.join(__dirname, '..');
@@ -39,7 +40,25 @@ async function apply(page, name, asOf) {
   await page.getByRole('button', { name: '确认更新看板', exact: true }).click();
   await page.locator('#uploadDialog').waitFor({ state: 'hidden' });
 }
-test('confirmed Excel imports survive reload with their original files and historical plans', async () => {
+async function downloadInitialWorkbook(page) {
+  const original = page.locator('.history-initial').getByRole('button', { name: '下载原文件', exact: true });
+  assert.equal(await original.count(), 1, 'initial record must offer its original workbook');
+  const event = page.waitForEvent('download');
+  await original.click();
+  const saved = await event;
+  assert.equal(saved.suggestedFilename(), '集团流程改革-彩棠试点项目工作计划.xlsx');
+  const bytes = await fs.readFile(await saved.path());
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), '61f5ea5959d8c3c75eba3a671100e8e911dbc52653e5c11bec95fd6020adce63');
+}
+test('initial record downloads the exact user-provided Excel file', async () => {
+  const context = await browser.newContext({ acceptDownloads: true });
+  try {
+    const page = await context.newPage();
+    await page.goto(base); await updates(page);
+    await downloadInitialWorkbook(page);
+  } finally { await context.close(); }
+});
+test('confirmed Excel imports survive reload with their original files and latest dashboard', async () => {
   const context = await browser.newContext({ acceptDownloads: true });
   try {
     const page = await context.newPage();
@@ -56,12 +75,6 @@ test('confirmed Excel imports survive reload with their original files and histo
     const download = await saved;
     assert.equal(download.suggestedFilename(), 'week-1.xlsx');
     assert.deepEqual(await fs.readFile(await download.path()), await fs.readFile(fixture('week-1.xlsx')));
-    await first.getByRole('button', { name: '查看', exact: true }).click();
-    const historical = page.locator('#historyDialog');
-    await historical.waitFor();
-    const oldRow = historical.locator('tr').filter({ hasText: '项目看板设计' });
-    assert.match(await oldRow.innerText(), /进行中/);
-    await historical.getByRole('button', { name: '关闭历史记录', exact: true }).click();
     await page.getByRole('button', { name: '阶段计划 02', exact: true }).click();
     const currentRow = page.locator('#planResults tr').filter({ hasText: '项目看板设计' });
     assert.match(await currentRow.innerText(), /已完成/);
@@ -114,6 +127,7 @@ test('exported standalone report opens offline and retains its own import histor
     offline.on('pageerror', error => errors.push(error.message));
     await offline.goto(pathToFileURL(reportPath).href); await updates(offline);
     assert.match(await offline.locator('body').innerText(), /2026-10-06/);
+    await downloadInitialWorkbook(offline);
     await apply(offline, 'week-1.xlsx', '2026-10-07');
     await offline.reload(); await updates(offline);
     assert.equal(await offline.locator('.history-record').count(), 1);
