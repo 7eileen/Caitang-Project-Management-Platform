@@ -61,6 +61,61 @@ async function downloadInitialWorkbook(page) {
   const bytes = await fs.readFile(await saved.path());
   assert.equal(createHash('sha256').update(bytes).digest('hex'), '61f5ea5959d8c3c75eba3a671100e8e911dbc52653e5c11bec95fd6020adce63');
 }
+test('Gantt today marker follows Beijing date independently of the uploaded report date', async () => {
+  const context = await browser.newContext({ timezoneId: 'America/Los_Angeles' });
+  try {
+    const page = await context.newPage();
+    await page.clock.install({ time: new Date('2026-09-29T16:00:00Z') });
+    await page.goto(base);
+    assert.equal(await page.locator('.today-line span').innerText(), '今天 09.30');
+    assert.match(await page.locator('.page-head .subtitle').innerText(), /报告基准 2026.09.29/);
+    const position = await page.locator('.today-line').first().evaluate(el => parseFloat(el.style.left));
+    assert.ok(Math.abs(position - 60 / 137 * 100) < 0.001, 'marker must occupy September 30 on the monthly scale (August 1 to December 16)');
+    await page.getByRole('button', { name: '周视图', exact: true }).click();
+    assert.equal(await page.locator('.today-line span').innerText(), '今天 09.30');
+    assert.match(await page.locator('.months').innerText(), /09.14 — 09.20/);
+  } finally { await context.close(); }
+});
+
+test('Gantt marker moves at Beijing midnight without changing uploaded statuses or progress', async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await page.clock.install({ time: new Date('2026-09-29T15:59:58Z') });
+    await page.clock.pauseAt(new Date('2026-09-29T15:59:58Z'));
+    await page.goto(base);
+    assert.equal(await page.locator('.today-line span').innerText(), '今天 09.29');
+    const before = await page.locator('.today-line').first().getAttribute('style');
+    const statuses = await page.locator('.stage-state').allTextContents();
+    const progress = await page.locator('.actual-line').evaluateAll(els => els.map(el => el.style.cssText));
+    await page.clock.runFor(2200);
+    assert.equal(await page.locator('.today-line span').innerText(), '今天 09.30');
+    assert.notEqual(await page.locator('.today-line').first().getAttribute('style'), before);
+    assert.deepEqual(await page.locator('.stage-state').allTextContents(), statuses);
+    assert.deepEqual(await page.locator('.actual-line').evaluateAll(els => els.map(el => el.style.cssText)), progress);
+    assert.match(await page.locator('.page-head .subtitle').innerText(), /报告基准 2026.09.29/);
+  } finally { await context.close(); }
+});
+
+test('returning to a sleeping tab refreshes the current day and the weekly window', async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await page.clock.install({ time: new Date('2026-09-29T02:00:00Z') });
+    await page.goto(base);
+    await page.getByRole('button', { name: '周视图', exact: true }).click();
+    await page.clock.setSystemTime(new Date('2026-10-05T02:00:00Z'));
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    assert.equal(await page.locator('.today-line span').innerText(), '今天 10.05');
+    assert.match(await page.locator('.months').innerText(), /09.21 — 09.27/);
+    await page.clock.setSystemTime(new Date('2026-10-12T02:00:00Z'));
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    assert.equal(await page.locator('.today-line span').innerText(), '今天 10.12');
+    assert.match(await page.locator('.months').innerText(), /09.28 — 10.04/);
+    assert.equal(await page.locator('[data-gran="week"].selected').count(), 1);
+  } finally { await context.close(); }
+});
+
 test('new deployment loads current code when the browser has an old app.js cached', async () => {
   const context = await browser.newContext({ acceptDownloads: true });
   try {
