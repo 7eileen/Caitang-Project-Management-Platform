@@ -131,6 +131,9 @@ test('planned and actual Gantt bars overlap translucently and preserve their own
       assert.ok(label.y >= planned.y && label.y + label.height <= planned.y + planned.height + 1, 'planned dates must be vertically inside the planned bar');
       assert.ok(label.x >= actual.x + actual.width, 'planned dates should occupy the exposed light portion');
       assert.ok(label.x + label.width <= planned.x + planned.width, 'planned dates must fit inside the planned bar');
+      const actualLabel = await implementation.locator('.actual-lane .range-label').boundingBox();
+      assert.ok(actualLabel.y >= actual.y && actualLabel.y + actualLabel.height <= actual.y + actual.height + 1, 'actual dates must be vertically inside the dark bar');
+      assert.ok(actualLabel.x >= actual.x && actualLabel.x + actualLabel.width <= actual.x + actual.width, 'actual dates must fit inside the dark bar');
     }
     await checkPlanLabelInsideLightBar();
     await page.setViewportSize({ width: 1186, height: 900 });

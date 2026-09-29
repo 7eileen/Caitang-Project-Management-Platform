@@ -46,7 +46,8 @@
 .gantt .actual-line{z-index:2;background:rgb(var(--stage-rgb));opacity:.82;box-shadow:0 5px 9px #3858c020}
 .gantt .range-label{position:absolute;line-height:18px;white-space:nowrap;font-size:11px;color:#536888;pointer-events:none;z-index:3;font-variant-numeric:tabular-nums}
 .gantt .plan-lane .range-label{top:0;line-height:23px}
-.gantt .actual-lane .range-label{top:27px;color:#33486a}
+.gantt .actual-lane .range-label{top:0;line-height:23px;color:#fff}
+.gantt .actual-lane .range-label.outside{top:27px;line-height:18px;color:#33486a}
 .range-unavailable{position:absolute;left:10px;line-height:18px;font-size:11px;color:#9aa8bf;white-space:nowrap}
 .plan-lane .range-unavailable{top:-21px}
 .actual-lane .range-unavailable{top:27px}
