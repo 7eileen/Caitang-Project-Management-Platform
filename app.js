@@ -46,6 +46,10 @@ function refreshCurrentDay() {
   if (nextDay !== currentDay) {
     currentDay = nextDay;
     if (view === 'overview') render();
+    else if (view === 'detail' && detailMode === 'plan-gantt' && model.hierarchical) {
+      const results=$('#planResults'),scrollLeft=results?.querySelector('.task-table-wrap')?.scrollLeft||0;
+      if(results){results.innerHTML=planResults();bindPlanResults();const wrapper=results.querySelector('.task-table-wrap');if(wrapper)wrapper.scrollLeft=scrollLeft;}
+    }
   }
   scheduleDayRefresh();
 }
@@ -116,14 +120,17 @@ function hierarchyPlanResults(){
 }
 function hierarchyGantt(rows){
  const DAY=86400000,dates=model.nodes.flatMap(p=>[p.start,p.end,p.actualStart,p.actualEnd]).filter(Boolean),first=Math.min(...dates.map(stamp)),last=Math.max(...dates.map(stamp)),dow=(new Date(first).getUTCDay()+6)%7,start=first-dow*DAY,weeks=Math.ceil((last-start+DAY)/(7*DAY)),end=start+weeks*7*DAY,pct=d=>Math.max(0,Math.min(100,(stamp(d)-start)/(end-start)*100));
- return `<div class="task-table-wrap"><div class="hierarchy-gantt" style="--weeks:${weeks};min-width:${430+weeks*88}px"><div class="hg-row hg-header"><div class="hg-frozen">阶段 / 任务<span>状态</span></div><div class="hg-weeks">${Array.from({length:weeks},(_,i)=>`<div><b>W${i+1}</b><small>${md(new Date(start+i*7*DAY).toISOString().slice(0,10))}</small></div>`).join('')}</div></div>${rows.map(p=>{
+ const insideToday=stamp(currentDay)>=start&&stamp(currentDay)<end,today=pct(currentDay);
+ const todayLabel=insideToday?`<span class="hg-today-label" style="left:clamp(30px,${today}%,calc(100% - 30px))" title="北京时间 ${currentDay}">今天 ${md(currentDay)}</span>`:'';
+ const todayLine=insideToday?`<span class="hg-today-line" style="left:${today}%" aria-hidden="true"></span>`:'';
+ return `<div class="task-table-wrap"><div class="hierarchy-gantt" style="--weeks:${weeks};min-width:${430+weeks*88}px"><div class="hg-row hg-header"><div class="hg-frozen">阶段 / 任务<span>状态</span></div><div class="hg-weeks">${Array.from({length:weeks},(_,i)=>`<div><b>W${i+1}</b><small>${md(new Date(start+i*7*DAY).toISOString().slice(0,10))}</small></div>`).join('')}${todayLabel}</div></div>${rows.map(p=>{
   const actualEnd=p.actualEnd||(p.actualStart&&source.asOf>=p.actualStart?source.asOf:'');
   const bar=(from,to,type)=>{
    if(!from||!to||to<from)return '';
    const prefix=type==='plan'?'计划':'实际',ending=type==='plan'||p.actualEnd?md(to):'进行中';
    return `<span class="hg-bar hg-${type} ${p.status==='已完成'?'done':''}" style="left:${pct(from)}%;width:${Math.max(.35,pct(new Date(stamp(to)+DAY).toISOString().slice(0,10))-pct(from))}%" title="${prefix} ${from} — ${type==='plan'||p.actualEnd?to:'进行中'}"></span><span class="hg-date-label hg-${type}-label">${prefix} ${md(from)} — ${ending}</span>`;
   };
-  return `<div class="hg-row ${p.kind==='stage'?'hg-stage':p.level===1?'hg-parent':''}" data-plan="${p.id}"><div class="hg-frozen"><div class="progress-name" style="--depth:${p.level}">${p.groupHeader?`<button class="progress-toggle" data-plan-group-toggle="${p.id}" aria-label="${collapsedPlanGroups.has(p.id)?'展开':'折叠'}${esc(p.name)}">${collapsedPlanGroups.has(p.id)?'+':'−'}</button>`:'<span class="progress-bullet"></span>'}<strong>${esc(p.name)}</strong></div><span class="badge ${cls(p.status)}">${esc(p.rawStatus||'未填')}</span></div><div class="hg-track">${bar(p.start,p.end,'plan')}${bar(p.actualStart,actualEnd,'actual')}${!p.start?'<span class="hg-missing">计划日期未填</span>':''}</div></div>`;
+  return `<div class="hg-row ${p.kind==='stage'?'hg-stage':p.level===1?'hg-parent':''}" data-plan="${p.id}"><div class="hg-frozen"><div class="progress-name" style="--depth:${p.level}">${p.groupHeader?`<button class="progress-toggle" data-plan-group-toggle="${p.id}" aria-label="${collapsedPlanGroups.has(p.id)?'展开':'折叠'}${esc(p.name)}">${collapsedPlanGroups.has(p.id)?'+':'−'}</button>`:'<span class="progress-bullet"></span>'}<strong>${esc(p.name)}</strong></div><span class="badge ${cls(p.status)}">${esc(p.rawStatus||'未填')}</span></div><div class="hg-track">${bar(p.start,p.end,'plan')}${bar(p.actualStart,actualEnd,'actual')}${!p.start?'<span class="hg-missing">计划日期未填</span>':''}${todayLine}</div></div>`;
  }).join('')}</div></div>`;
 }
 function showHierarchyPlan(p){

@@ -163,6 +163,39 @@ test('detailed Gantt labels show periods without collisions after filtering, fol
   } finally { await context.close(); }
 });
 
+test('detailed Gantt today marker follows Beijing midnight and wake-up while preserving its view', async () => {
+  const context = await browser.newContext({ viewport: { width: 1186, height: 872 }, timezoneId: 'America/Los_Angeles' });
+  try {
+    const page = await context.newPage();
+    await page.clock.install({ time: new Date('2026-09-29T15:59:59Z') });
+    await page.clock.pauseAt(new Date('2026-09-29T15:59:59Z'));
+    await page.goto(base.replace('/legacy/', '/'));
+    await page.getByRole('button', { name: '阶段计划 02', exact: true }).click();
+    await page.getByRole('button', { name: '计划甘特', exact: true }).click();
+    assert.equal(await page.locator('.hg-today-label').count(), 1);
+    assert.equal(await page.locator('.hg-today-label').innerText(), '今天 09.29');
+    assert.equal(await page.locator('.hg-today-line').count(), 55);
+    const position = () => page.locator('.hg-today-line').first().evaluate(el => parseFloat(el.style.left));
+    const before = await position();
+    assert.ok(Math.abs(before - 57 / 133 * 100) < 0.001, 'line must use the detailed chart date scale');
+    const snapshot = await page.evaluate(() => JSON.stringify(source));
+    await page.getByRole('button', { name: '折叠功能需求设计', exact: true }).click();
+    await page.locator('#planResults .task-table-wrap').evaluate(el => { el.scrollLeft = 400; });
+    await page.clock.runFor(2000);
+    assert.equal(await page.locator('.hg-today-label').innerText(), '今天 09.30');
+    assert.ok(Math.abs(await position() - before - 100 / 133) < 0.001);
+    assert.equal(await page.locator('.hg-today-line').count(), 45, 'collapsed hierarchy must stay collapsed');
+    assert.equal(await page.locator('#planResults .task-table-wrap').evaluate(el => el.scrollLeft), 400, 'horizontal scroll must be preserved');
+    await page.clock.setSystemTime(new Date('2026-10-02T02:00:00Z'));
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    assert.equal(await page.locator('.hg-today-label').innerText(), '今天 10.02');
+    assert.equal(await page.evaluate(() => JSON.stringify(source)), snapshot, 'live date must not alter uploaded dates or statuses');
+    await page.clock.setSystemTime(new Date('2027-01-01T02:00:00Z'));
+    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    assert.equal(await page.locator('.hg-today-line,.hg-today-label').count(), 0, 'do not pin an out-of-range day to a false date');
+  } finally { await context.close(); }
+});
+
 test('new workbook downloads unchanged and repeated imports persist after reload and offline export', async () => {
   const context = await browser.newContext({ acceptDownloads: true });
   try {
