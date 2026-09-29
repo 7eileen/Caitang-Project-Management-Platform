@@ -116,6 +116,37 @@ test('returning to a sleeping tab refreshes the current day and the weekly windo
   } finally { await context.close(); }
 });
 
+test('planned and actual Gantt bars stay separate and preserve their own start dates', async () => {
+  const context = await browser.newContext({ viewport: { width: 1538, height: 900 } });
+  try {
+    const page = await context.newPage();
+    await page.clock.install({ time: new Date('2026-09-29T02:00:00Z') });
+    await page.goto(base);
+    const row = page.locator('.gantt-row[data-stage="3"]');
+    const plan = await row.locator('.plan-line').boundingBox();
+    const actual = await row.locator('.actual-line').boundingBox();
+    assert.ok(plan.y + plan.height < actual.y, 'actual bar must not cover the plan bar');
+    assert.ok(Math.abs(plan.x - actual.x) < 1, 'matching start dates share the same horizontal coordinate');
+    assert.match(await row.innerText(), /计划 08.27 — 10.16/);
+    assert.match(await row.innerText(), /实际 08.27 — 进行中/);
+    await page.evaluate(() => { source.stages[3].actualStart = '2026-09-05'; render(); });
+    const shifted = await row.locator('.actual-line').boundingBox();
+    assert.ok(shifted.x > plan.x, 'a delayed actual start must move only the actual bar');
+    assert.match(await row.innerText(), /计划 08.27 — 10.16/);
+    assert.match(await row.innerText(), /实际 09.05 — 进行中/);
+    await page.getByRole('button', { name: '周视图', exact: true }).click();
+    const weeklyPlan = await row.locator('.plan-line').boundingBox();
+    const weeklyActual = await row.locator('.actual-line').boundingBox();
+    assert.ok(weeklyPlan.y + weeklyPlan.height < weeklyActual.y);
+    assert.match(await row.innerText(), /计划 08.27 — 10.16/);
+    assert.match(await row.innerText(), /实际 09.05 — 进行中/);
+    await page.evaluate(() => { source.stages[1].actualStart = '2026-09-21'; source.stages[1].actualEnd = '2026-09-23'; render(); });
+    const separateRange = page.locator('.gantt-row[data-stage="1"]');
+    assert.equal(await separateRange.locator('.plan-line').count(), 0);
+    assert.equal(await separateRange.locator('.actual-line').count(), 1, 'actual period remains visible even when the original plan is outside the window');
+  } finally { await context.close(); }
+});
+
 test('new deployment loads current code when the browser has an old app.js cached', async () => {
   const context = await browser.newContext({ acceptDownloads: true });
   try {
