@@ -127,10 +127,13 @@ test('planned and actual Gantt bars overlap translucently and preserve their own
     const actual = await row.locator('.actual-line').boundingBox();
     assert.equal(plan.y, actual.y, 'both ranges must share a single bar row');
     assert.equal(plan.height, actual.height);
-    const appearance = await row.evaluate(el => { const p = getComputedStyle(el.querySelector('.plan-line')), a = getComputedStyle(el.querySelector('.actual-line')); return { plan: p.backgroundColor, actual: a.backgroundColor, outline: p.borderTopStyle }; });
-    assert.match(appearance.plan, /rgba\(.+, 0\.14\)/);
-    assert.match(appearance.actual, /rgba\(.+, 0\.42\)/);
-    assert.equal(appearance.outline, 'dashed', 'original plan outline remains distinguishable through the overlap');
+    const appearance = await row.evaluate(el => { const p = getComputedStyle(el.querySelector('.plan-line')), a = getComputedStyle(el.querySelector('.actual-line')); return { plan: p.backgroundColor, actual: a.backgroundColor, outline: p.borderTopStyle, actualOutline: a.borderLeftStyle, planOpacity: Number(p.opacity), actualOpacity: Number(a.opacity) }; });
+    assert.equal(appearance.plan, 'rgb(233, 231, 250)', 'keep the original lavender plan color');
+    assert.ok(appearance.planOpacity > 0 && appearance.planOpacity < 1);
+    assert.equal(appearance.actual, 'rgb(113, 128, 227)', 'keep the original actual stage color');
+    assert.ok(appearance.actualOpacity > 0 && appearance.actualOpacity < 1);
+    assert.equal(appearance.outline, 'none', 'plan bar must have no outline');
+    assert.equal(appearance.actualOutline, 'none');
     assert.ok(Math.abs(plan.x - actual.x) < 1, 'matching start dates share the same horizontal coordinate');
     assert.match(await row.innerText(), /计划 08.27 — 10.16/);
     assert.match(await row.innerText(), /实际 08.27 — 进行中/);

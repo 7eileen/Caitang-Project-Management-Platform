@@ -79,10 +79,11 @@ function gantt(){
  return `<div class="gantt-scroll"><div class="gantt ${weekly?'weekly-gantt':''}"><div class="gantt-head"><div>阶段状态 / 项目阶段 / 主责部门</div><div class="months">${marks.map((d,i)=>`<span style="left:${pos(d)}%">${weekly?`<b>第 ${i+1} 周</b><small>${md(d)} — ${md(iso(stamp(d)+6*DAY))}</small>`:d.slice(5,7)+'月'}</span>`).join('')}</div></div><div class="gantt-body">${model.stages.map((s,i)=>{
   const actualEnd=s.actualEnd||((s.actualStart&&source.asOf>=s.actualStart)?source.asOf:'');
   const rgb=s.status==='已完成'?'48,182,164':i===3?'113,128,227':'70,98,221';
+  const planColor=i===3?'#e9e7fa':i===4?'#dfe7fc':'#e0f3ef';
   const planLabel=`计划 ${md(s.start)} — ${md(s.end)}`;
   const actualLabel=s.actualStart?`实际 ${md(s.actualStart)} — ${s.actualEnd?md(s.actualEnd):s.status==='进行中'?'进行中':'结束未填'}`:'实际开始时间未填';
   const actualTitle=s.actualStart?`实际开始：${s.actualStart}；${s.actualEnd?'实际结束：'+s.actualEnd:'实际结束未填，色条展示至报告日期 '+source.asOf}`:'原表未填写实际开始时间';
-  return `<div class="gantt-row" data-stage="${i}" role="button" tabindex="0" aria-label="查看${s.name}"><div class="stage-label"><span class="stage-state ${cls(s.status)}">${s.status==='已完成'?icon('check'):icon('clock')}${esc(s.status)}</span><div><strong>${s.name}</strong><small>${esc(s.owner)} · 主责部门</small></div></div><div class="track" style="--stage-rgb:${rgb}">${grid}${lane('plan',s.start,s.end,planLabel,`计划开始：${s.start}；计划结束：${s.end}`)}${lane('actual',s.actualStart,actualEnd,actualLabel,actualTitle)}${insideToday?`<span class="today-line" style="left:${today}%">${i===0?'<span title="北京时间">今天 '+md(currentDay)+'</span>':''}</span>`:''}</div></div>`;
+  return `<div class="gantt-row" data-stage="${i}" role="button" tabindex="0" aria-label="查看${s.name}"><div class="stage-label"><span class="stage-state ${cls(s.status)}">${s.status==='已完成'?icon('check'):icon('clock')}${esc(s.status)}</span><div><strong>${s.name}</strong><small>${esc(s.owner)} · 主责部门</small></div></div><div class="track" style="--stage-rgb:${rgb};--plan-color:${planColor}">${grid}${lane('plan',s.start,s.end,planLabel,`计划开始：${s.start}；计划结束：${s.end}`)}${lane('actual',s.actualStart,actualEnd,actualLabel,actualTitle)}${insideToday?`<span class="today-line" style="left:${today}%">${i===0?'<span title="北京时间">今天 '+md(currentDay)+'</span>':''}</span>`:''}</div></div>`;
  }).join('')}</div></div></div>`;
 }
 

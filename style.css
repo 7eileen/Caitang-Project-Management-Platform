@@ -41,9 +41,9 @@
 .gantt .gantt-row{min-height:80px;height:80px}
 .gantt .track{height:80px}
 .gantt-lane{position:absolute;left:0;right:0;top:28px;height:23px}
-.gantt .plan-line,.gantt .actual-line{top:0;height:23px;min-width:5px;border-radius:4px;box-shadow:none}
-.gantt .plan-line{z-index:2;background:rgba(var(--stage-rgb),.14);border:1px dashed rgba(var(--stage-rgb),.7)}
-.gantt .actual-line{z-index:1;background:rgba(var(--stage-rgb),.42);border-left:2px solid rgba(var(--stage-rgb),.9)}
+.gantt .plan-line,.gantt .actual-line{top:0;height:23px;min-width:5px;border-radius:5px;border:0;box-shadow:none}
+.gantt .plan-line{z-index:1;background:var(--plan-color);opacity:.9}
+.gantt .actual-line{z-index:2;background:rgb(var(--stage-rgb));opacity:.82;box-shadow:0 5px 9px #3858c020}
 .gantt .range-label{position:absolute;line-height:18px;white-space:nowrap;font-size:11px;color:#536888;pointer-events:none;z-index:3;font-variant-numeric:tabular-nums}
 .gantt .plan-lane .range-label{top:-21px}
 .gantt .actual-lane .range-label{top:27px;color:#33486a}
@@ -51,5 +51,5 @@
 .plan-lane .range-unavailable{top:-21px}
 .actual-lane .range-unavailable{top:27px}
 .range-unavailable small{margin-left:12px;color:#b1bdd0;font-size:10px}
-.legend i.planned-key{background:rgba(70,98,221,.14);border:1px dashed rgba(70,98,221,.7)}
-.legend i.actual-key{background:rgba(70,98,221,.42);border-left:2px solid rgba(70,98,221,.9)}
+.legend i.planned-key{background:#dfe7fc;opacity:.9;border:0}
+.legend i.actual-key{background:#4662dd;opacity:.82;border:0}
