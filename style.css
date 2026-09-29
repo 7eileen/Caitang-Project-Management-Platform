@@ -102,6 +102,9 @@
 .hg-actual{background:#637de0;opacity:.82;box-shadow:0 3px 8px #3858c01a}
 .hg-actual.done{background:#30b6a4}
 .hg-plan.done{background:#e0f3ef}
+.hg-date-label{position:absolute;top:17px;line-height:19px;white-space:nowrap;font-size:11px;font-variant-numeric:tabular-nums;color:#536888;z-index:3;pointer-events:none}
+.hg-actual-label{color:#fff}
+.hg-actual-label.outside{color:#33486a}
 .hg-stage .hg-frozen,.hg-stage .hg-track{background-color:#edf3ff}
 .hg-stage .progress-name strong{font-weight:600;color:#31517e}
 .hg-parent .hg-frozen,.hg-parent .hg-track{background-color:#f8faff}

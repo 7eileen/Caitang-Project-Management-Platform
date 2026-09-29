@@ -128,6 +128,41 @@ test('current dashboard shows six stages, combined date periods, hierarchy and k
   } finally { await context.close(); }
 });
 
+test('detailed Gantt labels show periods without collisions after filtering, folding and resizing', async () => {
+  const context = await browser.newContext({ viewport: { width: 1923, height: 872 } });
+  try {
+    const page = await context.newPage();
+    await page.goto(base.replace('/legacy/', '/'));
+    await page.getByRole('button', { name: '阶段计划 02', exact: true }).click();
+    await page.getByRole('button', { name: '计划甘特', exact: true }).click();
+    async function checkLabels() {
+      assert.equal(await page.locator('.hg-plan-label').count(), await page.locator('.hg-plan').count());
+      assert.equal(await page.locator('.hg-actual-label').count(), await page.locator('.hg-actual').count());
+      for (const row of await page.locator('.hg-row:not(.hg-header)').all()) {
+        const labels = row.locator('.hg-date-label'), track = await row.locator('.hg-track').boundingBox();
+        const boxes = await Promise.all((await labels.all()).map(label => label.boundingBox()));
+        for (const box of boxes) assert.ok(box.x >= track.x - 1 && box.x + box.width <= track.x + track.width + 1, 'period labels must not be clipped');
+        if (boxes.length === 2) {
+          const [p, a] = boxes;
+          assert.ok(Math.abs(p.y - a.y) < 1, 'both periods stay on one line');
+          assert.ok(p.x + p.width + 5 <= a.x || a.x + a.width + 5 <= p.x, 'period labels must not overlap');
+        }
+      }
+    }
+    assert.match(await page.locator('.hg-row[data-plan="progress-5"]').innerText(), /计划 08.27 — 10.16[\s\S]*实际 08.27 — 进行中/);
+    assert.match(await page.locator('.hg-row[data-plan="progress-17"]').innerText(), /实际 10.08 — 10.16/);
+    assert.match(await page.locator('.hg-row[data-plan="progress-56"]').innerText(), /计划 12.10 — 12.10/);
+    await checkLabels();
+    await page.getByRole('button', { name: '折叠功能需求设计', exact: true }).click();
+    await checkLabels();
+    await page.getByRole('textbox', { name: '搜索细分计划' }).fill('预算管理');
+    await checkLabels();
+    await page.setViewportSize({ width: 1186, height: 872 });
+    await page.evaluate(() => positionGanttLabels());
+    await checkLabels();
+  } finally { await context.close(); }
+});
+
 test('new workbook downloads unchanged and repeated imports persist after reload and offline export', async () => {
   const context = await browser.newContext({ acceptDownloads: true });
   try {
