@@ -123,6 +123,20 @@ test('planned and actual Gantt bars overlap translucently and preserve their own
     await page.clock.install({ time: new Date('2026-09-29T02:00:00Z') });
     await page.goto(base);
     const row = page.locator('.gantt-row[data-stage="3"]');
+    const implementation = page.locator('.gantt-row[data-stage="4"]');
+    async function checkPlanLabelInsideLightBar() {
+      const planned = await implementation.locator('.plan-line').boundingBox();
+      const actual = await implementation.locator('.actual-line').boundingBox();
+      const label = await implementation.locator('.plan-lane .range-label').boundingBox();
+      assert.ok(label.y >= planned.y && label.y + label.height <= planned.y + planned.height + 1, 'planned dates must be vertically inside the planned bar');
+      assert.ok(label.x >= actual.x + actual.width, 'planned dates should occupy the exposed light portion');
+      assert.ok(label.x + label.width <= planned.x + planned.width, 'planned dates must fit inside the planned bar');
+    }
+    await checkPlanLabelInsideLightBar();
+    await page.setViewportSize({ width: 1186, height: 900 });
+    await checkPlanLabelInsideLightBar();
+    await page.setViewportSize({ width: 1538, height: 900 });
+
     const plan = await row.locator('.plan-line').boundingBox();
     const actual = await row.locator('.actual-line').boundingBox();
     assert.equal(plan.y, actual.y, 'both ranges must share a single bar row');
@@ -146,6 +160,7 @@ test('planned and actual Gantt bars overlap translucently and preserve their own
     const weeklyPlan = await row.locator('.plan-line').boundingBox();
     const weeklyActual = await row.locator('.actual-line').boundingBox();
     assert.equal(weeklyPlan.y, weeklyActual.y);
+    await checkPlanLabelInsideLightBar();
     assert.match(await row.innerText(), /计划 08.27 — 10.16/);
     assert.match(await row.innerText(), /实际 09.05 — 进行中/);
     await page.evaluate(() => { source.stages[1].actualStart = '2026-09-21'; source.stages[1].actualEnd = '2026-09-23'; render(); });
