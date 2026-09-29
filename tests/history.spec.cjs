@@ -14,13 +14,20 @@ const fixture = name => path.join(__dirname, 'fixtures', name);
 before(async () => {
   server = http.createServer(async (req, res) => {
     try {
-      const name = new URL(req.url, 'http://localhost').pathname;
+      let name = new URL(req.url, 'http://localhost').pathname;
+      const legacy = name.startsWith('/legacy/');
+      if (legacy) name = name.slice(7);
+      if (legacy && name === '/data.js') {
+        res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+        res.end(await fs.readFile(fixture('legacy-data.js')));
+        return;
+      }
       if (name === '/cache-seed.html') {
         res.setHeader('Content-Type', 'text/html');
         res.end('<!doctype html><html><body><script src="app.js"></script></body></html>');
         return;
       }
-      if (serveLegacyScript && req.url === '/app.js') {
+      if (serveLegacyScript && name === '/app.js' && !req.url.includes('?')) {
         res.setHeader('Content-Type', 'text/javascript');
         res.setHeader('Cache-Control', 'public, max-age=3600');
         res.end('document.body.dataset.legacyLoaded="yes";');
@@ -33,7 +40,7 @@ before(async () => {
     } catch { res.writeHead(404); res.end(); }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  base = `http://127.0.0.1:${server.address().port}/`;
+  base = `http://127.0.0.1:${server.address().port}/legacy/`;
   browser = await chromium.launch({ channel: 'msedge', headless: true });
 });
 after(async () => { await browser?.close(); await new Promise(resolve => server.close(resolve)); });
@@ -61,6 +68,105 @@ async function downloadInitialWorkbook(page) {
   const bytes = await fs.readFile(await saved.path());
   assert.equal(createHash('sha256').update(bytes).digest('hex'), '61f5ea5959d8c3c75eba3a671100e8e911dbc52653e5c11bec95fd6020adce63');
 }
+
+test('new progress workbook imports its explicit hierarchy and original actual dates', async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await page.goto(base);
+    const encoded = (await fs.readFile(fixture('new-progress.xlsx'))).toString('base64');
+    const parsed = await page.evaluate(async encoded => {
+      const sheets = await readXlsx(Uint8Array.from(atob(encoded), x => x.charCodeAt(0)).buffer);
+      return parseModel({ ...source, sheets });
+    }, encoded);
+    assert.equal(parsed.stages.length, 6);
+    assert.equal(parsed.nodes.length, 55);
+    assert.equal(parsed.plans.length, 49);
+    assert.equal(parsed.nodes.filter(x => x.leaf).length, 45);
+    assert.equal(parsed.nodes.filter(x => x.leaf && x.status === '已完成').length, 21);
+    const approval = parsed.plans.find(x => x.name === '新审批流设计');
+    assert.equal(approval.actualEnd, '2026-10-16');
+    assert.equal(approval.rawStatus, '进行中');
+    assert.equal(parsed.stages[5].start, '2026-12-10');
+    assert.equal(parsed.conclusions.length, 2);
+  } finally { await context.close(); }
+});
+
+test('current dashboard shows six stages, the eight Excel columns, hierarchy and key conclusions', async () => {
+  const context = await browser.newContext({ viewport: { width: 1538, height: 950 } });
+  try {
+    const page = await context.newPage();
+    const errors = []; page.on('pageerror', e => errors.push(e.message));
+    await page.goto(base.replace('/legacy/', '/'));
+    assert.equal(await page.locator('.gantt-row').count(), 6);
+    assert.match(await page.locator('.metrics').innerText(), /50/);
+    assert.match(await page.locator('.conclusions').innerText(), /关键结论[\s\S]*本次不上线标准合同模板。[\s\S]*本次不上线预算自动释放功能。/);
+    await page.getByRole('button', { name: '阶段计划 02', exact: true }).click();
+    assert.equal(await page.locator('.progress-table tbody tr').count(), 55);
+    assert.deepEqual((await page.locator('.progress-table th').allTextContents()).slice(0, 8), ['名称','主责部门','层级','计划开始时间','计划结束时间','实际开始时间','实际结束时间','阶段状态']);
+    await page.getByRole('button', { name: '折叠功能需求设计', exact: true }).click();
+    assert.equal(await page.locator('.progress-table tbody tr').count(), 45);
+    await page.getByRole('button', { name: '展开功能需求设计', exact: true }).click();
+    const approval = page.locator('.progress-table tr').filter({ hasText: '新审批流设计' });
+    assert.match(await approval.innerText(), /10.08[\s\S]*10.16[\s\S]*10.08[\s\S]*10.16[\s\S]*进行中/);
+    await approval.click();
+    assert.match(await page.locator('#drawer').innerText(), /实际结束时间[\s\S]*2026-10-16/);
+    await page.getByRole('button', { name: '关闭计划详情', exact: true }).click();
+    await page.getByRole('textbox', { name: '搜索细分计划' }).fill('预算管理');
+    assert.equal(await page.locator('.progress-table tr').filter({ hasText: '1.预算管理' }).count(), 4);
+    await page.getByRole('textbox', { name: '搜索细分计划' }).fill('');
+    await page.getByRole('button', { name: '计划甘特', exact: true }).click();
+    assert.equal(await page.locator('.hg-row:not(.hg-header)').count(), 55);
+    assert.equal(await page.locator('.hg-weeks > div').count(), 19);
+    await page.getByRole('button', { name: '上线试运行', exact: true }).click();
+    assert.match(await page.locator('#planResults').innerText(), /12.10[\s\S]*未开始/);
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+});
+
+test('new workbook downloads unchanged and repeated imports persist after reload and offline export', async () => {
+  const context = await browser.newContext({ acceptDownloads: true });
+  try {
+    const page = await context.newPage();
+    await page.goto(base.replace('/legacy/', '/')); await updates(page);
+    const event = page.waitForEvent('download');
+    await page.locator('.history-bundled').getByRole('button', { name: '下载原文件', exact: true }).click();
+    const file = await event;
+    assert.equal(file.suggestedFilename(), '彩棠工作台项目进度表.xlsx');
+    assert.deepEqual(await fs.readFile(await file.path()), await fs.readFile(fixture('new-progress.xlsx')));
+    await downloadInitialWorkbook(page);
+    await apply(page, 'new-progress.xlsx', '2026-10-01');
+    await page.reload(); await updates(page);
+    assert.equal(await page.locator('.history-record').count(), 1);
+    await page.getByRole('button', { name: '项目总览 01', exact: true }).click();
+    assert.equal(await page.locator('.gantt-row').count(), 6);
+    const reportEvent=page.waitForEvent('download');
+    await page.getByRole('button', { name: '导出汇报版', exact: true }).click();
+    const report=await reportEvent,reportPath=(await report.path())+'.html';await report.saveAs(reportPath);
+    const offline=await context.newPage();await offline.goto(pathToFileURL(reportPath).href);
+    assert.equal(await offline.locator('.gantt-row').count(),6);
+    await updates(offline);
+    assert.equal(await offline.locator('.history-bundled').count(),1);
+    await offline.getByRole('button', { name: '阶段计划 02', exact: true }).click();
+    assert.equal(await offline.locator('.progress-table tbody tr').count(),55);
+  } finally { await context.close(); }
+});
+
+test('old stored data does not replace the new published workbook and its archive stays downloadable', async () => {
+  const context=await browser.newContext({acceptDownloads:true});
+  try {
+    const page=await context.newPage();await page.goto(base.replace('/legacy/','/'));await updates(page);
+    const old=JSON.parse((await fs.readFile(fixture('legacy-data.js'),'utf8')).replace(/^window.INITIAL_DATA=/,'').replace(/;$/,''));
+    const encoded=(await fs.readFile(fixture('week-1.xlsx'))).toString('base64');
+    await page.evaluate(async ({old,encoded})=>{
+      await storeImport({id:'old-import',name:'old-week.xlsx',createdAt:1,time:'旧版记录',changes:1,asOf:old.asOf,snapshot:old},new Blob([Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))]));
+    },{old,encoded});
+    await page.reload();assert.equal(await page.locator('.gantt-row').count(),6);await updates(page);
+    assert.equal(await page.locator('.history-record').count(),1);
+    const event=page.waitForEvent('download');await page.locator('.history-record').getByRole('button',{name:'下载原文件',exact:true}).click();
+    assert.deepEqual(await fs.readFile(await (await event).path()),await fs.readFile(fixture('week-1.xlsx')));
+  } finally {await context.close()}
+});
 test('Gantt today marker follows Beijing date independently of the uploaded report date', async () => {
   const context = await browser.newContext({ timezoneId: 'America/Los_Angeles' });
   try {
