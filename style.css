@@ -100,12 +100,12 @@
 .milestone-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));grid-auto-rows:1fr;gap:12px;padding:4px 22px 22px}
 .milestone-item{position:relative;display:grid;grid-template-columns:80px minmax(0,1fr);align-items:end;gap:14px;min-height:146px;padding:38px 16px 18px;border:1px solid #e8edf6;border-radius:11px;background:#fff;transition:border-color .15s,box-shadow .15s}
 .milestone-item:hover{border-color:#bdc9ed;box-shadow:0 4px 14px #40528c0a}
-.milestone-item .date-tile{display:flex;flex-direction:column;justify-content:center;align-items:center;flex:none;width:80px;min-width:80px;height:88px;padding:10px 0;gap:5px;border:1px solid #dfe6f6;border-top:3px solid #8b9cec;border-radius:8px;background:linear-gradient(180deg,#f5f7ff,#fff);font-size:34px;line-height:1;font-weight:550;color:#4f65aa}
+.milestone-item .date-tile{display:flex;flex-direction:column;justify-content:center;align-items:center;align-self:stretch;flex:none;width:80px;min-width:80px;min-height:88px;padding:10px 0;gap:5px;border:1px solid #dfe6f6;border-top:3px solid #8b9cec;border-radius:8px;background:linear-gradient(180deg,#f5f7ff,#fff);font-size:34px;line-height:1;font-weight:550;color:#4f65aa}
 .milestone-item .date-tile small{margin:0;font-size:12px;font-weight:400;color:#8091b7;line-height:1.4}
-.milestone-item>div:nth-child(2){width:100%;min-width:0;align-self:end}
+.milestone-item>div:nth-child(2){width:100%;min-width:0;align-self:end;padding-top:30px}
 .milestone-item strong{display:block;font-size:13px;font-weight:550;line-height:1.65;color:#354d72}
 .milestone-item p{font-size:11px;line-height:1.6;margin:6px 0 0}
-.milestone-item .badge{position:absolute;top:12px;right:14px;margin:0;font-size:10px}
+.milestone-item .badge{position:absolute;top:38px;right:14px;margin:0;font-size:10px}
 .blockers-panel{align-self:start}
 .history-bundled{flex-wrap:wrap}
 .hg-row{display:grid;grid-template-columns:430px 1fr;min-height:52px;border-bottom:1px solid #edf1f8;cursor:pointer}
