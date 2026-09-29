@@ -8,13 +8,24 @@ const http = require('node:http');
 const { pathToFileURL } = require('node:url');
 const { createHash } = require('node:crypto');
 const { chromium } = require('playwright');
-let browser, server, base;
+let browser, server, base, serveLegacyScript = false;
 const root = process.env.CAITANG_TEST_ROOT || path.join(__dirname, '..');
 const fixture = name => path.join(__dirname, 'fixtures', name);
 before(async () => {
   server = http.createServer(async (req, res) => {
     try {
       const name = new URL(req.url, 'http://localhost').pathname;
+      if (name === '/cache-seed.html') {
+        res.setHeader('Content-Type', 'text/html');
+        res.end('<!doctype html><html><body><script src="app.js"></script></body></html>');
+        return;
+      }
+      if (serveLegacyScript && req.url === '/app.js') {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.end('document.body.dataset.legacyLoaded="yes";');
+        return;
+      }
       const file = path.join(root, name === '/' ? 'index.html' : name);
       const data = await fs.readFile(file);
       res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css' : 'text/html; charset=utf-8');
@@ -50,6 +61,20 @@ async function downloadInitialWorkbook(page) {
   const bytes = await fs.readFile(await saved.path());
   assert.equal(createHash('sha256').update(bytes).digest('hex'), '61f5ea5959d8c3c75eba3a671100e8e911dbc52653e5c11bec95fd6020adce63');
 }
+test('new deployment loads current code when the browser has an old app.js cached', async () => {
+  const context = await browser.newContext({ acceptDownloads: true });
+  try {
+    const page = await context.newPage();
+    serveLegacyScript = true;
+    await page.goto(base + 'cache-seed.html');
+    assert.equal(await page.locator('body').getAttribute('data-legacy-loaded'), 'yes');
+    serveLegacyScript = false;
+    await page.goto(base);
+    assert.notEqual(await page.locator('body').getAttribute('data-legacy-loaded'), 'yes', 'new page must not load the old cached script');
+    await updates(page);
+    await downloadInitialWorkbook(page);
+  } finally { serveLegacyScript = false; await context.close(); }
+});
 test('initial record downloads the exact user-provided Excel file', async () => {
   const context = await browser.newContext({ acceptDownloads: true });
   try {

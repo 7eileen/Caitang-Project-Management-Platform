@@ -6,7 +6,7 @@
 
 - **离线汇报**：下载 [`downloads/彩棠项目驾驶舱.html`](downloads/彩棠项目驾驶舱.html)，使用 Chrome 或 Edge 双击打开，无需联网。
 - **运行源码**：在仓库目录执行 `python -m http.server 8765`，访问 `http://localhost:8765`。
-- **重新生成离线版**：使用 Python 3 执行 `python scripts/build_offline.py`，生成文件位于 `downloads/`。
+- **发布前构建**：使用 Python 3 执行 `python scripts/build_offline.py`。脚本按文件内容更新在线资源版本号，避免浏览器沿用旧脚本，同时在 `downloads/` 生成离线版。
 
 ## 页面内容
 
@@ -49,4 +49,4 @@ Excel 解压使用 Pako，MIT 许可声明保留在 `app.js` 中。
 
 ## 验证
 
-`tests/history.spec.cjs` 覆盖导入确认、刷新恢复、初始与历史 Excel 原文件下载一致性、取消与无效文件、存储失败，以及离线导出后的导入记录。需要 Node.js、Playwright 和 Microsoft Edge；安装 Playwright 后运行 `node --test tests/history.spec.cjs`。测试使用隔离浏览器及合成 Excel，不写入日常使用的浏览器记录。
+`tests/history.spec.cjs` 覆盖旧脚本缓存下的新版本加载、导入确认、刷新恢复、初始与历史 Excel 原文件下载一致性、取消与无效文件、存储失败，以及离线导出后的导入记录。需要 Node.js、Playwright 和 Microsoft Edge；安装 Playwright 后运行 `node --test tests/history.spec.cjs`。测试使用隔离浏览器及合成 Excel，不写入日常使用的浏览器记录。
