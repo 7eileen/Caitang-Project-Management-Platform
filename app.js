@@ -88,6 +88,7 @@ function parseProgress(src){
  return{hierarchical:true,sheet:sheet.sheet,nodes,plans:nodes.filter(n=>n.kind!=='stage'),stages,conclusions,tasks:[],aux:[],modules:[]};
 }
 function progressDate(p,key){const value=p[key];if(value)return md(value);return String(p.rawDates?.[['start','end','actualStart','actualEnd'].indexOf(key)]||'').trim()==='/'?'/':'—'}
+function progressPeriod(p,actual=false,full=false){return (actual?['actualStart','actualEnd']:['start','end']).map(key=>full&&p[key]?p[key]:progressDate(p,key)).join(' — ')}
 function hierarchyVisiblePlans(){
  const all=model.nodes,map=new Map(all.map(p=>[p.id,p])),selected=new Set();
  const descends=(node,id)=>{while(node){if(node.id===id)return true;node=map.get(node.parent)}return false};
@@ -111,7 +112,7 @@ function hierarchyPlanResults(){
  if(!rows.length)return '<div class="empty">没有符合条件的任务<button class="text-btn" data-reset-plan>清除筛选</button></div>';
  const footer=`<div class="table-footer"><span>${rows.filter(p=>p.leaf).length} 项末级任务 · 保留原表层级与顺序</span><span>“/”为原表未填日期</span></div>`;
  if(detailMode==='plan-gantt')return hierarchyGantt(visible)+footer;
- return `<div class="task-table-wrap"><table class="task-table progress-table"><thead><tr>${PROGRESS_HEADERS.map(h=>`<th>${h}</th>`).join('')}<th></th></tr></thead><tbody>${visible.map(p=>`<tr class="progress-row ${p.kind==='stage'?'progress-stage':p.level===1?'progress-parent':''}" data-plan="${p.id}"><td><div class="progress-name" style="--depth:${p.level}">${p.groupHeader?`<button class="progress-toggle" data-plan-group-toggle="${p.id}" aria-label="${collapsedPlanGroups.has(p.id)?'展开':'折叠'}${esc(p.name)}" aria-expanded="${!collapsedPlanGroups.has(p.id)}">${collapsedPlanGroups.has(p.id)?'+':'−'}</button>`:'<span class="progress-bullet"></span>'}<strong>${esc(p.name)}</strong></div></td><td class="progress-owner">${esc(p.owner||'—')}</td><td><span class="level-tag level-${p.level}">${p.levelName}</span></td>${['start','end','actualStart','actualEnd'].map(k=>`<td class="progress-date ${k.startsWith('actual')?'actual-date':''}">${progressDate(p,k)}</td>`).join('')}<td><span class="badge ${cls(p.status)}">${esc(p.rawStatus||'未填')}</span></td><td class="plan-chevron">${icon('chevron')}</td></tr>`).join('')}</tbody></table></div>`+footer;
+ return `<div class="task-table-wrap"><table class="task-table progress-table"><thead><tr>${['名称','主责部门','层级','计划周期','实际周期','阶段状态'].map(h=>`<th>${h}</th>`).join('')}<th></th></tr></thead><tbody>${visible.map(p=>`<tr class="progress-row ${p.kind==='stage'?'progress-stage':p.level===1?'progress-parent':''}" data-plan="${p.id}"><td><div class="progress-name" style="--depth:${p.level}">${p.groupHeader?`<button class="progress-toggle" data-plan-group-toggle="${p.id}" aria-label="${collapsedPlanGroups.has(p.id)?'展开':'折叠'}${esc(p.name)}" aria-expanded="${!collapsedPlanGroups.has(p.id)}">${collapsedPlanGroups.has(p.id)?'+':'−'}</button>`:'<span class="progress-bullet"></span>'}<strong>${esc(p.name)}</strong></div></td><td class="progress-owner">${esc(p.owner||'—')}</td><td><span class="level-tag level-${p.level}">${p.levelName}</span></td><td class="progress-date">${progressPeriod(p)}</td><td class="progress-date actual-date">${progressPeriod(p,true)}</td><td><span class="badge ${cls(p.status)}">${esc(p.rawStatus||'未填')}</span></td><td class="plan-chevron">${icon('chevron')}</td></tr>`).join('')}</tbody></table></div>`+footer;
 }
 function hierarchyGantt(rows){
  const DAY=86400000,dates=model.nodes.flatMap(p=>[p.start,p.end,p.actualStart,p.actualEnd]).filter(Boolean),first=Math.min(...dates.map(stamp)),last=Math.max(...dates.map(stamp)),dow=(new Date(first).getUTCDay()+6)%7,start=first-dow*DAY,weeks=Math.ceil((last-start+DAY)/(7*DAY)),end=start+weeks*7*DAY,pct=d=>Math.max(0,Math.min(100,(stamp(d)-start)/(end-start)*100));
@@ -123,7 +124,7 @@ function hierarchyGantt(rows){
 }
 function showHierarchyPlan(p){
  const stage=model.stages[p.stage];
- $('#drawerContent').innerHTML=`<div class="drawer-header"><span>${esc(p.levelName)}详情</span><button class="icon-btn" data-close="drawer" aria-label="关闭计划详情">${icon('close')}</button></div><div class="drawer-body"><div class="eyebrow">${esc(stage.name)}${p.level===2?' / '+esc(p.group):''}</div><h2>${esc(p.name)}</h2><span class="badge ${cls(p.status)}">${esc(p.rawStatus||'未填')}</span><div class="property-grid"><div><small>主责部门</small><strong>${esc(p.owner||'原表未填')}</strong></div><div><small>层级</small><strong>${p.levelName}</strong></div>${['start','end','actualStart','actualEnd'].map((k,i)=>`<div><small>${PROGRESS_HEADERS[i+3]}</small><strong>${p[k]||'/'}</strong></div>`).join('')}</div><div class="source-line">${esc(source.sourceFile||'彩棠工作台项目进度表.xlsx')}<br>工作表「${esc(p.sheet)}」· 第 ${p.row} 行</div></div>`;
+ $('#drawerContent').innerHTML=`<div class="drawer-header"><span>${esc(p.levelName)}详情</span><button class="icon-btn" data-close="drawer" aria-label="关闭计划详情">${icon('close')}</button></div><div class="drawer-body"><div class="eyebrow">${esc(stage.name)}${p.level===2?' / '+esc(p.group):''}</div><h2>${esc(p.name)}</h2><span class="badge ${cls(p.status)}">${esc(p.rawStatus||'未填')}</span><div class="property-grid"><div><small>主责部门</small><strong>${esc(p.owner||'原表未填')}</strong></div><div><small>层级</small><strong>${p.levelName}</strong></div><div><small>计划周期</small><strong>${progressPeriod(p,false,true)}</strong></div><div><small>实际周期</small><strong>${progressPeriod(p,true,true)}</strong></div></div><div class="source-line">${esc(source.sourceFile||'彩棠工作台项目进度表.xlsx')}<br>工作表「${esc(p.sheet)}」· 第 ${p.row} 行</div></div>`;
  if(!$('#drawer').open)$('#drawer').showModal();$('#drawer [data-close]').onclick=()=>$('#drawer').close();
 }
 function projectConclusions(){
@@ -148,22 +149,36 @@ function header(title,sub,eyebrow='PROJECT OVERVIEW'){return `<div class="page-h
 function render(){ currentDay=beijingToday();$('#crumb').textContent={overview:'项目总览',detail:'阶段计划',updates:'每周数据更新'}[view];$$('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('#main').innerHTML=({overview:overview,detail:details,updates:updates}[view])();icons();bind();positionGanttLabels();const complete=model.stages.filter(s=>s.status==='已完成').length;$('.project-health strong').textContent=model.stages.filter(s=>s.status==='进行中').map(s=>s.name.replace('阶段','')).join('与')||'查看各阶段状态';$('.project-health small').textContent=`${complete} / ${model.stages.length} 个阶段已完成`;$('.mini-phases').innerHTML=model.stages.map(s=>s.status==='已完成'?'<b></b>':'<i></i>').join('');}
 function overview(){const done=model.stages.filter(s=>s.status==='已完成').length,active=model.stages.filter(s=>s.status==='进行中').length,rows=planRows(),leaves=rows.filter(p=>p.leaf),running=leaves.filter(p=>p.status==='进行中'),next=model.stages.filter(s=>s.status!=='已完成'&&s.end>=source.asOf).sort((a,b)=>a.end.localeCompare(b.end))[0];return header('彩棠工作台项目管理',`计划周期 ${model.stages[0].start.replaceAll('-','.')} — ${model.stages.at(-1).end.replaceAll('-','.')}`)+`<section class="metrics"><div class="metric"><div class="metric-top">阶段完成率 ${icon('layers')}</div><div class="metric-value">${Math.round(done/model.stages.length*100)}<small>%</small></div><div class="metric-foot"><em>${done} 个阶段已完成</em>共 ${model.stages.length} 个阶段</div><div class="donut" style="background:conic-gradient(var(--blue) ${Math.round(done/model.stages.length*100)}%,#edf1fa 0)"></div></div><div class="metric"><div class="metric-top">当前进行阶段 ${icon('clock')}</div><div class="metric-value">${String(active).padStart(2,'0')}<small>个</small></div><div class="metric-foot">${model.stages.filter(s=>s.status==='进行中').map(s=>s.name.replace('阶段','')).join(' · ')||'暂无进行中的阶段'}</div></div><div class="metric"><div class="metric-top">下一阶段里程碑 ${icon('flag')}</div><div class="metric-value">${next?md(next.end):'—'}<small>${next?'2026':''}</small></div><div class="metric-foot">${next?next.name+'计划结束':'暂无待完成里程碑'}</div></div><button class="metric" style="text-align:left" data-action="allPlans"><div class="metric-top">细分计划项 ${icon('gantt')}</div><div class="metric-value">${leaves.length}<small>项</small></div><div class="metric-foot"><em>${leaves.filter(p=>p.status==='已完成').length} 项已完成</em>来源：${esc(model.sheet||'项目计划')}</div></button></section><div class="overview-grid"><section class="panel"><div class="panel-head"><div><h2>项目阶段甘特图 <small>PROJECT ROADMAP</small></h2><p>计划与实际同步呈现 · 点击阶段查看细分计划</p></div><div class="segments"><button data-gran="month" class="${granularity==='month'?'selected':''}">月视图</button><button data-gran="week" class="${granularity==='week'?'selected':''}">周视图</button></div></div><div class="legend"><span><i class="planned-key"></i>计划周期（浅色）</span><span><i class="actual-key"></i>实际周期（深色）</span><span><i></i>已完成</span><span class="hint">实际结束时间以总管理表为准</span></div>${gantt()}</section></div><div class="lower-grid"><section class="panel"><div class="panel-head"><h2>关键里程碑 <small>MILESTONES</small></h2>${icon('flag')}</div><div class="milestone-list">${milestoneItems()}</div></section><section class="panel blockers-panel"><div class="panel-head"><h2>当前项目卡点 <small>PROJECT BLOCKERS</small></h2></div>${projectConclusions()}</section></div>`}
 function positionGanttLabels() {
- $$('.gantt .plan-lane .range-label').forEach(label => {
-  const lane=label.parentElement,track=lane.parentElement,plan=lane.querySelector('.plan-line'),actual=track.querySelector('.actual-line');
-  if(!plan)return;
-  const left=plan.offsetLeft,right=left+plan.offsetWidth,labelWidth=label.offsetWidth,padding=6;
-  const spaces=actual?[[left,Math.min(right,actual.offsetLeft)],[Math.max(left,actual.offsetLeft+actual.offsetWidth),right]]:[[left,right]];
-  const space=spaces.filter(([a,b])=>b-a>=labelWidth+padding*2).sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]))[0];
-  // Prefer exposed planned time; keep short-bar labels beside the bar so dates stay readable.
-  const x=space?space[0]+padding:plan.offsetWidth>=labelWidth+padding*2?right-labelWidth-padding:Math.min(right+padding,track.clientWidth-labelWidth-padding);
-  label.style.left=Math.max(0,x)+'px';
- });
- $$('.gantt .actual-lane .range-label').forEach(label => {
-  const actual=label.parentElement.querySelector('.actual-line');
-  if(!actual)return;
-  const fits=actual.offsetWidth>=label.offsetWidth+12;
-  label.classList.toggle('outside',!fits);
-  label.style.left=(actual.offsetLeft+6)+'px';
+ $$('.gantt .track').forEach(track => {
+  const plan=track.querySelector('.plan-line'),actual=track.querySelector('.actual-line'),p=track.querySelector('.plan-lane .range-label'),a=track.querySelector('.actual-lane .range-label');
+  const padding=6,gap=12,width=track.clientWidth,origin=track.getBoundingClientRect().left;
+  const range=bar=>{const box=bar.getBoundingClientRect();return [box.left-origin,box.right-origin]};
+  const pr=plan?range(plan):null,ar=actual?range(actual):null,pw=p?.getBoundingClientRect().width||0,aw=a?.getBoundingClientRect().width||0;
+  const clamp=(x,w)=>Math.max(padding,Math.min(x,width-w-padding));
+  let px=0,ax=0,actualInside=!!ar&&ar[1]-ar[0]>=aw+padding*2;
+  if(a&&ar){
+   a.classList.toggle('outside',!actualInside);
+   ax=clamp(actualInside?ar[0]+padding:ar[1]+padding,aw);
+  }
+  if(p&&pr){
+   const spaces=ar?[[pr[0],Math.min(pr[1],ar[0])],[Math.max(pr[0],ar[1]),pr[1]]]:[pr];
+   const space=spaces.filter(([left,right])=>right-left>=pw+padding*2).sort((x,y)=>(y[1]-y[0])-(x[1]-x[0]))[0];
+   px=clamp(space?space[0]+padding:Math.max(pr[1],ar?.[1]||0)+padding,pw);
+  }
+  // Position the pair together: identical or overlapping dates must never cover each other.
+  if(p&&a&&pr&&ar&&px<ax+aw+gap&&ax<px+pw+gap){
+   if(actualInside&&ax+aw+gap+pw<=width-padding)px=ax+aw+gap;
+   else if(actualInside&&ax-pw-gap>=padding)px=ax-pw-gap;
+   else{
+    const total=pw+gap+aw,right=Math.max(pr[1],ar[1])+padding,left=Math.min(pr[0],ar[0])-padding-total;
+    px=clamp(right+total<=width-padding?right:left>=padding?left:right,total);
+    ax=px+pw+gap;
+    actualInside=false;
+    a.classList.add('outside');
+   }
+  }
+  if(p)p.style.left=px+'px';
+  if(a)a.style.left=ax+'px';
  });
 }
 function gantt(){

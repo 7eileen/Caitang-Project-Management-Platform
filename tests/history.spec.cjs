@@ -92,7 +92,7 @@ test('new progress workbook imports its explicit hierarchy and original actual d
   } finally { await context.close(); }
 });
 
-test('current dashboard shows six stages, the eight Excel columns, hierarchy and key conclusions', async () => {
+test('current dashboard shows six stages, combined date periods, hierarchy and key conclusions', async () => {
   const context = await browser.newContext({ viewport: { width: 1538, height: 950 } });
   try {
     const page = await context.newPage();
@@ -103,14 +103,18 @@ test('current dashboard shows six stages, the eight Excel columns, hierarchy and
     assert.match(await page.locator('.conclusions').innerText(), /关键结论[\s\S]*本次不上线标准合同模板。[\s\S]*本次不上线预算自动释放功能。/);
     await page.getByRole('button', { name: '阶段计划 02', exact: true }).click();
     assert.equal(await page.locator('.progress-table tbody tr').count(), 55);
-    assert.deepEqual((await page.locator('.progress-table th').allTextContents()).slice(0, 8), ['名称','主责部门','层级','计划开始时间','计划结束时间','实际开始时间','实际结束时间','阶段状态']);
+    assert.deepEqual((await page.locator('.progress-table th').allTextContents()).filter(Boolean), ['名称','主责部门','层级','计划周期','实际周期','阶段状态']);
+    const design = page.locator('.progress-table tr[data-plan="progress-5"]');
+    assert.equal(await design.locator('td').nth(3).innerText(), '08.27 — 10.16');
+    assert.equal(await design.locator('td').nth(4).innerText(), '08.27 — /');
+    assert.equal(await page.locator('.progress-table tr[data-plan="progress-56"] td').nth(4).innerText(), '/ — /');
     await page.getByRole('button', { name: '折叠功能需求设计', exact: true }).click();
     assert.equal(await page.locator('.progress-table tbody tr').count(), 45);
     await page.getByRole('button', { name: '展开功能需求设计', exact: true }).click();
     const approval = page.locator('.progress-table tr').filter({ hasText: '新审批流设计' });
     assert.match(await approval.innerText(), /10.08[\s\S]*10.16[\s\S]*10.08[\s\S]*10.16[\s\S]*进行中/);
     await approval.click();
-    assert.match(await page.locator('#drawer').innerText(), /实际结束时间[\s\S]*2026-10-16/);
+    assert.match(await page.locator('#drawer').innerText(), /实际周期[\s\S]*2026-10-08 — 2026-10-16/);
     await page.getByRole('button', { name: '关闭计划详情', exact: true }).click();
     await page.getByRole('textbox', { name: '搜索细分计划' }).fill('预算管理');
     assert.equal(await page.locator('.progress-table tr').filter({ hasText: '1.预算管理' }).count(), 4);
@@ -276,6 +280,41 @@ test('planned and actual Gantt bars overlap translucently and preserve their own
     const separateRange = page.locator('.gantt-row[data-stage="1"]');
     assert.equal(await separateRange.locator('.plan-line').count(), 0);
     assert.equal(await separateRange.locator('.actual-line').count(), 1, 'actual period remains visible even when the original plan is outside the window');
+  } finally { await context.close(); }
+});
+
+test('Gantt dates stay side by side without collisions at different widths and overlapping periods', async () => {
+  const context = await browser.newContext({ viewport: { width: 1923, height: 872 } });
+  try {
+    const page = await context.newPage();
+    await page.clock.install({ time: new Date('2026-09-29T02:00:00Z') });
+    await page.goto(base.replace('/legacy/', '/'));
+    async function checkDates() {
+      const rows = page.locator('.gantt-row');
+      for (let i = 0; i < await rows.count(); i++) {
+        const row = rows.nth(i), p = row.locator('.plan-lane .range-label'), a = row.locator('.actual-lane .range-label');
+        if (!await p.count() || !await a.count()) continue;
+        const plan = await p.boundingBox(), actual = await a.boundingBox(), track = await row.locator('.track').boundingBox();
+        assert.ok(Math.abs(plan.y - actual.y) < 1, `row ${i}: date labels must share one line`);
+        assert.ok(plan.x + plan.width + 5 <= actual.x || actual.x + actual.width + 5 <= plan.x, `row ${i}: dates must not collide`);
+        for (const box of [plan, actual]) assert.ok(box.x >= track.x - 1 && box.x + box.width <= track.x + track.width + 1, `row ${i}: dates must stay within the timeline`);
+      }
+    }
+    for (const width of [1923, 1538, 1186, 780]) {
+      await page.setViewportSize({ width, height: 872 });
+      await page.evaluate(() => positionGanttLabels());
+      await checkDates();
+    }
+    // Matching periods near the right edge and partially overlapping periods need the same protection.
+    await page.evaluate(() => {
+      model.stages[1].start = model.stages[1].actualStart = '2026-12-08';
+      model.stages[1].end = model.stages[1].actualEnd = '2026-12-10';
+      model.stages[2].actualStart = '2026-08-20'; model.stages[2].actualEnd = '2026-09-05';
+      $('#main').innerHTML = overview(); bind(); positionGanttLabels();
+    });
+    await checkDates();
+    await page.getByRole('button', { name: '周视图', exact: true }).click();
+    await checkDates();
   } finally { await context.close(); }
 });
 
