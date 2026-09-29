@@ -116,7 +116,7 @@ test('returning to a sleeping tab refreshes the current day and the weekly windo
   } finally { await context.close(); }
 });
 
-test('planned and actual Gantt bars stay separate and preserve their own start dates', async () => {
+test('planned and actual Gantt bars overlap translucently and preserve their own start dates', async () => {
   const context = await browser.newContext({ viewport: { width: 1538, height: 900 } });
   try {
     const page = await context.newPage();
@@ -125,7 +125,12 @@ test('planned and actual Gantt bars stay separate and preserve their own start d
     const row = page.locator('.gantt-row[data-stage="3"]');
     const plan = await row.locator('.plan-line').boundingBox();
     const actual = await row.locator('.actual-line').boundingBox();
-    assert.ok(plan.y + plan.height < actual.y, 'actual bar must not cover the plan bar');
+    assert.equal(plan.y, actual.y, 'both ranges must share a single bar row');
+    assert.equal(plan.height, actual.height);
+    const appearance = await row.evaluate(el => { const p = getComputedStyle(el.querySelector('.plan-line')), a = getComputedStyle(el.querySelector('.actual-line')); return { plan: p.backgroundColor, actual: a.backgroundColor, outline: p.borderTopStyle }; });
+    assert.match(appearance.plan, /rgba\(.+, 0\.14\)/);
+    assert.match(appearance.actual, /rgba\(.+, 0\.42\)/);
+    assert.equal(appearance.outline, 'dashed', 'original plan outline remains distinguishable through the overlap');
     assert.ok(Math.abs(plan.x - actual.x) < 1, 'matching start dates share the same horizontal coordinate');
     assert.match(await row.innerText(), /计划 08.27 — 10.16/);
     assert.match(await row.innerText(), /实际 08.27 — 进行中/);
@@ -137,7 +142,7 @@ test('planned and actual Gantt bars stay separate and preserve their own start d
     await page.getByRole('button', { name: '周视图', exact: true }).click();
     const weeklyPlan = await row.locator('.plan-line').boundingBox();
     const weeklyActual = await row.locator('.actual-line').boundingBox();
-    assert.ok(weeklyPlan.y + weeklyPlan.height < weeklyActual.y);
+    assert.equal(weeklyPlan.y, weeklyActual.y);
     assert.match(await row.innerText(), /计划 08.27 — 10.16/);
     assert.match(await row.innerText(), /实际 09.05 — 进行中/);
     await page.evaluate(() => { source.stages[1].actualStart = '2026-09-21'; source.stages[1].actualEnd = '2026-09-23'; render(); });
