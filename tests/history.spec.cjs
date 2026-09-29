@@ -102,6 +102,8 @@ test('current dashboard shows six stages, combined date periods, hierarchy and k
     assert.match(await page.locator('.metrics').innerText(), /50/);
     assert.match(await page.locator('.conclusions').innerText(), /关键结论[\s\S]*本次不上线标准合同模板。[\s\S]*本次不上线预算自动释放功能。/);
     await page.getByRole('button', { name: '阶段计划 02', exact: true }).click();
+    assert.equal(await page.locator('.hierarchy-gantt').count(), 1, 'sidebar entry defaults to Gantt');
+    await page.getByRole('button', { name: '阶段表格', exact: true }).click();
     assert.equal(await page.locator('.progress-table tbody tr').count(), 55);
     assert.deepEqual((await page.locator('.progress-table th').allTextContents()).filter(Boolean), ['名称','主责部门','层级','计划周期','实际周期','阶段状态']);
     const design = page.locator('.progress-table tr[data-plan="progress-5"]');
@@ -123,7 +125,13 @@ test('current dashboard shows six stages, combined date periods, hierarchy and k
     assert.equal(await page.locator('.hg-row:not(.hg-header)').count(), 55);
     assert.equal(await page.locator('.hg-weeks > div').count(), 19);
     await page.getByRole('button', { name: '上线试运行', exact: true }).click();
-    assert.match(await page.locator('#planResults').innerText(), /12.10[\s\S]*未开始/);
+    assert.equal(await page.locator('[data-plan-mode="plan-gantt"].selected').count(), 1, 'stage entry defaults to Gantt');
+    assert.match(await page.locator('.hg-row[data-plan="progress-56"]').innerText(), /未开始[\s\S]*计划 12.10 — 12.10/);
+    await page.getByRole('button', { name: '项目总览 01', exact: true }).click();
+    await page.getByRole('button', { name: '查看实施落地阶段', exact: true }).click();
+    assert.equal(await page.locator('[data-plan-mode="plan-gantt"].selected').count(), 1, 'overview stage entry defaults to Gantt');
+    await page.getByRole('button', { name: '阶段表格', exact: true }).click();
+    assert.equal(await page.locator('.progress-table').count(), 1, 'table remains available after a stage drill-down');
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
 });
@@ -243,6 +251,8 @@ test('new workbook downloads unchanged and repeated imports persist after reload
     await updates(offline);
     assert.equal(await offline.locator('.history-bundled').count(),1);
     await offline.getByRole('button', { name: '阶段计划 02', exact: true }).click();
+    assert.equal(await offline.locator('.hierarchy-gantt').count(),1);
+    await offline.getByRole('button', { name: '阶段表格', exact: true }).click();
     assert.equal(await offline.locator('.progress-table tbody tr').count(),55);
   } finally { await context.close(); }
 });
@@ -450,6 +460,7 @@ test('confirmed Excel imports survive reload with their original files and lates
     assert.deepEqual(await fs.readFile(await download.path()), await fs.readFile(fixture('week-1.xlsx')));
     await page.getByRole('button', { name: '阶段计划 02', exact: true }).click();
     const currentRow = page.locator('#planResults tr').filter({ hasText: '项目看板设计' });
+    await page.locator('[data-plan-mode="plan"]').click();
     assert.match(await currentRow.innerText(), /已完成/);
     await page.getByRole('button', { name: '项目总览 01', exact: true }).click();
     assert.equal(await page.locator('.page-head .subtitle').innerText(), '计划周期 2026.08.03 — 2026.12.09');
@@ -483,6 +494,7 @@ test('storage failure leaves the current dashboard unchanged and allows retry', 
     await page.reload(); await updates(page);
     assert.equal(await page.locator('.history-record').count(), 0);
     await page.getByRole('button', { name: '阶段计划 02', exact: true }).click();
+    await page.locator('[data-plan-mode="plan"]').click();
     assert.equal(await page.locator('#planResults tbody tr').count(), 39);
   } finally { await context.close(); }
 });
