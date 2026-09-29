@@ -148,10 +148,10 @@ function milestoneItems(){
    const tasks=model.plans.filter(p=>p.stage===index&&p.level===1);
    return (tasks.length?tasks:[stage]).map(p=>{
     const owner=p.owner||stage.owner,team=owner==='战略'?'战略小组':owner,isTask=p.level===1;
-    return{date:p.end,name:isTask?team+p.name+'完成':p.name+(p.name==='上线试运行'?'':'完成'),desc:team+' · '+(isTask?'一级任务':'阶段计划'),task:isTask?p.id:'',stage:index,row:p.row};
+    return{date:p.end,name:isTask?team+p.name+'完成':p.name+(p.name==='上线试运行'?'':'完成'),desc:team+' · '+(isTask?'一级任务':'阶段计划'),task:isTask?p.id:'',stage:index,row:p.row,done:p.status==='已完成'};
    });
   }).filter(m=>m.date&&m.date>=(source.asOf||'')).sort((a,b)=>a.date.localeCompare(b.date)||a.row-b.row);
-  return milestones.length?milestones.map(m=>`<button class="milestone-item" style="width:100%;text-align:left" ${m.task?`data-plan="${m.task}"`:`data-stage="${m.stage}"`}><div class="date-tile"><small>${m.date.slice(5,7)}月</small>${m.date.slice(8)}</div><div><strong>${esc(m.name)}</strong><p>${esc(m.desc)}</p></div><span class="badge active">计划节点</span></button>`).join(''):'<div class="empty">暂无后续里程碑</div>';
+  return milestones.length?milestones.map(m=>`<button class="milestone-item" style="width:100%;text-align:left" ${m.task?`data-plan="${m.task}"`:`data-stage="${m.stage}"`}><div class="date-tile"><small>${m.date.slice(5,7)}月</small>${m.date.slice(8)}</div><div><strong>${esc(m.name)}</strong><p>${esc(m.desc)}</p></div><span class="badge ${m.done?'done':'active'}">${m.done?'已完成':'计划节点'}</span></button>`).join(''):'<div class="empty">暂无后续里程碑</div>';
  }
  const development=model.plans.find(p=>p.name==='实施开发'||p.name.includes('实施开发开发计划'));
  const items=[{date:model.stages[3]?.end,name:'详细设计阶段完成',desc:'战略 · 阶段计划',stage:3},{date:development?.end,name:'实施开发计划完成',desc:'项目进度计划',stage:4},{date:model.stages[4]?.end,name:'实施落地阶段完成',desc:'数科 · 阶段计划',stage:4}];
