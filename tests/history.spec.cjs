@@ -196,6 +196,29 @@ test('detailed Gantt today marker follows Beijing midnight and wake-up while pre
   } finally { await context.close(); }
 });
 
+test('milestones use first-level tasks, fall back to stages and start with the September 30 design milestone', async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await page.goto(base.replace('/legacy/', '/'));
+    const milestones = page.locator('.milestone-item');
+    assert.equal(await milestones.count(), 7);
+    assert.match(await milestones.first().innerText(), /09月[\s\S]*30[\s\S]*战略小组功能需求设计完成/);
+    assert.deepEqual(await milestones.locator('strong').allTextContents(), ['战略小组功能需求设计完成','战略小组新审批流设计完成','战略小组项目看板设计完成','数科需求评审完成','数科实施开发完成','数科功能测试完成','上线试运行']);
+    assert.deepEqual(await milestones.locator('.date-tile').allTextContents(), ['09月30','10月16','10月16','10月30','12月02','12月09','12月10']);
+    assert.equal(await milestones.filter({ hasText: '详细设计阶段完成' }).count(), 0, 'do not duplicate a stage that has first-level milestones');
+    await milestones.first().click();
+    assert.match(await page.locator('#drawer').innerText(), /一级任务详情[\s\S]*功能需求设计[\s\S]*2026-08-27 — 2026-09-30/);
+    await page.getByRole('button', { name: '关闭计划详情', exact: true }).click();
+    // Move the reporting snapshot earlier to verify stage fallback for phases without first-level tasks.
+    await page.evaluate(() => { source.asOf='2026-08-01'; render(); });
+    assert.equal(await milestones.count(), 10);
+    assert.deepEqual((await milestones.locator('strong').allTextContents()).slice(0,3), ['启动完成','规划阶段完成','调研阶段完成']);
+    await milestones.filter({ hasText: '上线试运行' }).click();
+    assert.match(await page.locator('.detail-summary').innerText(), /上线试运行/);
+  } finally { await context.close(); }
+});
+
 test('new workbook downloads unchanged and repeated imports persist after reload and offline export', async () => {
   const context = await browser.newContext({ acceptDownloads: true });
   try {
