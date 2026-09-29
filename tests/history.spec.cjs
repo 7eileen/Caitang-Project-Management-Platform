@@ -68,7 +68,7 @@ test('Gantt today marker follows Beijing date independently of the uploaded repo
     await page.clock.install({ time: new Date('2026-09-29T16:00:00Z') });
     await page.goto(base);
     assert.equal(await page.locator('.today-line span').innerText(), '今天 09.30');
-    assert.match(await page.locator('.page-head .subtitle').innerText(), /报告基准 2026.09.29/);
+    assert.equal(await page.evaluate(() => source.asOf), '2026-09-29');
     const position = await page.locator('.today-line').first().evaluate(el => parseFloat(el.style.left));
     assert.ok(Math.abs(position - 60 / 137 * 100) < 0.001, 'marker must occupy September 30 on the monthly scale (August 1 to December 16)');
     await page.getByRole('button', { name: '周视图', exact: true }).click();
@@ -93,7 +93,7 @@ test('Gantt marker moves at Beijing midnight without changing uploaded statuses 
     assert.notEqual(await page.locator('.today-line').first().getAttribute('style'), before);
     assert.deepEqual(await page.locator('.stage-state').allTextContents(), statuses);
     assert.deepEqual(await page.locator('.actual-line').evaluateAll(els => els.map(el => el.style.cssText)), progress);
-    assert.match(await page.locator('.page-head .subtitle').innerText(), /报告基准 2026.09.29/);
+    assert.equal(await page.evaluate(() => source.asOf), '2026-09-29');
   } finally { await context.close(); }
 });
 
@@ -159,8 +159,10 @@ test('confirmed Excel imports survive reload with their original files and lates
     const currentRow = page.locator('#planResults tr').filter({ hasText: '项目看板设计' });
     assert.match(await currentRow.innerText(), /已完成/);
     await page.getByRole('button', { name: '项目总览 01', exact: true }).click();
-    assert.match(await page.locator('body').innerText(), /2026.10.06|2026-10-06/);
-    await updates(page); await preview(page, 'week-1.xlsx');
+    assert.equal(await page.locator('.page-head .subtitle').innerText(), '计划周期 2026.08.03 — 2026.12.09');
+    await updates(page);
+    assert.match(await page.locator('.page-head .subtitle').innerText(), /2026-10-06/);
+    await preview(page, 'week-1.xlsx');
     await page.getByRole('button', { name: '取消', exact: true }).click();
     await page.locator('#fileInput').setInputFiles({ name: 'broken.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from('invalid') });
     await page.getByRole('heading', { name: '暂时无法导入' }).waitFor();
